@@ -1,0 +1,104 @@
+'Name: Avinash Joshua
+'Date: July 18th 2022
+'Rev: 1.0 
+
+
+option explicit
+
+'Constants for CanBus config
+#define BITRATE_500K 	2
+#define RAW_CAN			3
+
+'Constants for CanBus send
+#define HEADER			1
+#define BYTECOUNT		2
+
+
+'Function arguments for CanSetup()
+dim canBitRate as integer
+dim canDeviceAddr as integer
+dim canMsgFilter as integer
+dim canMode as integer
+
+'Function arguments for CanSetup()
+dim canHeader as integer
+dim canByteCount as integer
+dim canMessageHigher as integer
+dim canMessageLower as integer
+
+
+'Variables initialization
+dim i as integer
+dim byte as integer
+dim offset as integer
+
+dim temp as integer
+
+
+
+
+'main loop
+while 1
+
+	
+	
+	canBitRate = BITRATE_500K
+	canMode = RAW_CAN
+	canMsgFilter = 0x100
+	canDeviceAddr = 0x50
+	GoSub CanSetup
+	
+	canHeader = 0x50
+	canMessageHigher =0x89FFFE
+	canMessageLower = 0x12345678
+	canByteCount = 7
+	
+	GoSub CanSend
+	
+	while 1
+    end while
+
+end while
+
+
+'					*******CanSetup******
+'Args: canMode(0-5),canBitRate(0-4)
+'	   canMsgFilter(0-127),canDeviceAddr(0-127)
+'					**********************
+CanSetup:
+	
+	setconfig(_CEN,canMode)
+	setconfig(_CBR, canBitRate)
+	setconfig(_CLSN,canMsgFilter)
+	setconfig(_CNOD,canDeviceAddr) 
+    Return
+
+'					*******CanSend*******
+'Args: canHeader(0x00-0xFF), canByteCount(1-8),
+'	   canMessageHigh(0x00-0xFFFFFFFF),
+'	   canMessageLow(0x00-0xFFFFFFFF)
+'Note: Due to the compiler limitation can message has to broken into two ints
+'					*********************
+CanSend:
+	offset = 0
+	setcommand(_CS,HEADER,canHeader)
+	if(canByteCount > 4)
+		For i = 0 AndWhile i <(canByteCount-4)
+	
+			byte = canMessageHigher And 0xFF 'Extract only the lower byte
+			setcommand(_CS,(canByteCount+2)-i,byte)
+			canMessageHigher = canMessageHigher >> 8
+			offset++ 'used 
+		Next
+	End If
+	
+	For i = 0 AndWhile i <(canByteCount-offset)
+	
+		byte = canMessageLower And 0xFF 'Extract only the lower byte
+		setcommand(_CS,(canByteCount+2-offset)-i,byte)
+		canMessageLower = canMessageLower >> 8
+	Next
+	setcommand(_CS,BYTECOUNT,canByteCount)
+	Return
+	
+

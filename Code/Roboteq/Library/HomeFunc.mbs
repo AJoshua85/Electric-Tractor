@@ -1,0 +1,67 @@
+'Name: Avinash Joshua
+'Date: July 20th 2022
+'Rev: 1.0 
+
+option explicit
+
+#define MOTOR_OPEN_LOOP			1
+#define MOTOR_CLOSED_LOOP_COUNT		3
+
+#define NO_ACTION			0
+#define SET_FWD_SWITCH_ACTION		4
+#define SET_REV_SWITCH_ACTION		5
+
+#define LIMIT_SW_OFFSET			10
+#define HOME_SPEED			200	
+
+dim rpm as integer
+dim pos as integer
+
+'main loop
+while 1
+	
+	GoSub Home
+	
+	while 1
+    end while
+
+end while
+
+'					*******Home******
+Home:
+    'Motor Configuration
+	setconfig(_MMOD,1,MOTOR_OPEN_LOOP)'Set channel 1 to open loop
+    	setconfig(_BHLA, 1, NO_ACTION)'Disable limit switch action
+	setconfig(_BLLA, 1, NO_ACTION)'Disable limit switch action
+	setcommand(_GO, 1, HOME_SPEED*-1)'Start motor in reverse direction
+	wait(1000)
+	
+	Do
+		rpm = getvalue(_BLSPEED,1)
+		if rpm = 0 then
+			setcommand(_GO, 1, 0) 'Stop motor when RPM = 0
+		End if
+    Loop Until (rpm = 0)
+    
+	pos = getvalue(_CB,1)' Read hall counter min physical limit
+ 	setconfig(_BHL, 1, pos+LIMIT_SW_OFFSET)'Set min limit switch
+    	setconfig(_BLLA, 1, SET_REV_SWITCH_ACTION)'Set min limit switch action to reverse limit switch
+	setcommand(_GO, 1, HOME_SPEED)'Start motor in forward direction
+	wait(1000)   
+    Do
+		rpm = getvalue(_BLSPEED,1)
+		if rpm = 0 then
+			setcommand(_GO, 1, 0) 'Stop motor when RPM = 0
+		End if
+    Loop Until (rpm = 0)
+    
+	pos = getvalue(_CB,1)' Read hall counter max physical limit
+ 	setconfig(_BHL, 1,pos-LIMIT_SW_OFFSET)'Set max limit switch
+    	setconfig(_BHLA, 1, SET_FWD_SWITCH_ACTION)'Set max limit switch action to forward limit switch
+	setconfig(_MMOD,1,MOTOR_CLOSED_LOOP_COUNT)'Set channel 1 count position mode
+	pos = pos/2
+	setcommand(_P, 1, pos)
+	
+	wait(500)
+	Return
+

@@ -1,0 +1,92 @@
+option explicit
+
+#define MOTOR_OPEN_LOOP				0
+#define MOTOR_CLOSED_LOOP_COUNT		3
+
+#define NO_ACTION					0
+#define SET_FWD_SWITCH_ACTION		4
+#define SET_REV_SWITCH_ACTION		5
+
+#define LIMIT_SW_OFFSET				10
+#define HOME_SPEED					200	
+#define DELAY						1000
+#define AMP_LIMIT_FWD				100
+#define AMP_LIMIT_REV				(AMP_LIMIT_FWD*-1)
+
+
+#define DISABLE_CAN					0
+#define ENABLE_CANOPEN				1			
+
+dim amp as integer
+dim pos as integer
+
+'main loop
+while 1
+	
+	
+	GoSub Home
+	while 1
+	
+	'wait(2000)
+    end while
+
+end while
+
+'					*******Home******
+Home:
+	pos = 0
+	setconfig(_CEN, DISABLE_CAN)'Disable CAN
+
+    'Motor Configuration
+	setconfig(_MMOD,1,MOTOR_OPEN_LOOP)'Set channel 1 to open loop
+	
+    setconfig(_BHLA, 1, NO_ACTION)'Disable limit switch action
+	setconfig(_BLLA, 1, NO_ACTION)'Disable limit switch action
+	setcommand(_GO, 1, HOME_SPEED*-1)'Start motor in reverse direction
+	setconfig(_MAC, 1, 5000)'Set starting motor acceleration for Homing
+	
+	
+	Do
+		amp = getvalue(_A, 1)
+		if amp <= AMP_LIMIT_REV then
+			setcommand(_GO, 1, 0) 'Stop motor 
+		End if
+	Loop Until (amp  <= AMP_LIMIT_REV)
+    
+	setcommand(_CB, 1,0)'Reset counter to zero 
+ 	setconfig(_BLL, 1, pos+LIMIT_SW_OFFSET)'Set min limit switch
+	print(pos+LIMIT_SW_OFFSET,"\n")
+    setconfig(_BLLA, 1, SET_REV_SWITCH_ACTION)'Set min limit switch action to reverse limit switch
+	
+	
+	setcommand(_GO, 1, HOME_SPEED)'Start motor in forward direction
+	  
+    Do
+		amp = getvalue(_A, 1)
+		if amp >= AMP_LIMIT_FWD then
+			setcommand(_GO, 1, 0) 'Stop motor
+		End if
+    Loop Until (amp >= AMP_LIMIT_FWD)
+    
+	pos = getvalue(_CB,1)' Read hall counter max physical limit
+ 	setconfig(_BHL, 1,pos-LIMIT_SW_OFFSET)'Set max limit switch
+	print(pos-LIMIT_SW_OFFSET,"\n")
+    setconfig(_BHLA, 1, SET_FWD_SWITCH_ACTION)'Set max limit switch action to forward limit switch
+	setconfig(_MMOD,1,MOTOR_CLOSED_LOOP_COUNT)'Set channel 1 count position mode
+	pos = (pos/2)
+	setconfig(_MAC, 1, 15000)'Set starting motor acceleration for Moving
+	setconfig(_MDEC, 1, 15000)'Set starting motor acceleration for Moving
+	
+	wait(DELAY)'This delay is required otherwise setcommand command doesn't work
+	setcommand(_MOTPOS, 1, pos)
+	
+	wait(3000)'Wait for the motor to travel to the center
+	setconfig(_MMOD,1,MOTOR_OPEN_LOOP)
+	wait(1000)
+	
+	setcommand(_CB, 1,0)'Reset counter to zero for center point
+	setconfig(_MMOD,1,MOTOR_CLOSED_LOOP_COUNT)
+	setconfig(_CEN, ENABLE_CANOPEN)'Enable CanOpen
+	
+	Return
+

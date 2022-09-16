@@ -1,0 +1,160 @@
+option explicit
+
+#define PERCENT_10		0
+#define PERCENT_20		1
+
+#define BRAKE_THRESHOLD				10
+#define DEAD_BAND					100
+
+#define BRAKE_ACTIVATE_THRESHOLD	500
+#define BRAKE_RELEASE_THRESHOLD		200
+
+''' Linear Equation for 0% to 10% for Reverse For Analog value from 2000-4300
+'#define SLOPE_R			43478	
+'#define OFFSET_R		86956521
+
+''' Linear Equation for 0% to 10% for Forward For Analog values from 830-3730
+'#define SLOPE_F			34482
+'#define OFFSET_F		28620689
+
+
+#define SCALE	1000000
+
+dim SLOPE_F[3] As Integer
+dim OFFSET_F[3] As Integer
+
+dim SLOPE_R[3] As Integer
+dim OFFSET_R[3] As Integer
+
+
+
+
+
+dim curValFwdAnalog As Integer
+dim curValRevAnalog As Integer
+dim preValFwdAnalog As Integer
+dim preValRevAnalog As Integer
+
+dim throttle As Integer
+
+
+dim brake As Integer
+
+
+dim direction As Integer
+dim rpm1 As Integer
+dim rpm2 As Integer
+
+'Linear Equation for 0% to 10% for Forward For Analog values from 830-3730
+SLOPE_F[0] = 62068
+OFFSET_F[0] = 51517241
+
+'Linear Equation for 0% to 10% for Reverse For Analog value from 2000-4300
+SLOPE_R[0] = 78260
+OFFSET_R[0] = 156521739
+
+preValFwdAnalog = 0
+preValRevAnalog = 0
+
+'main loop
+while 1
+	
+	Gosub ReadAnalog
+	
+	wait(1)
+    
+end while
+
+
+ReadAnalog:
+
+	'Read Analog Channel 1 & 2
+	curValRevAnalog = getvalue(_AI,1)
+	curValFwdAnalog = getvalue(_AI,3)
+		
+		'Check if new value is greater/less than channel noise
+		if (curValFwdAnalog > (preValFwdAnalog + DEAD_BAND) ) Or (curValFwdAnalog < (preValFwdAnalog- DEAD_BAND) ) then
+			'Convert analog value to motor command
+			throttle = ( (SLOPE_F[0]*(curValFwdAnalog) - OFFSET_F[0])) /SCALE
+			preValFwdAnalog = curValFwdAnalog
+		end if
+		'print("\nF: ",throttle)
+		'Check if new value is greater/less than channel noise
+		if (curValRevAnalog > (preValRevAnalog+DEAD_BAND) ) Or (curValRevAnalog < (preValRevAnalog - DEAD_BAND) ) then
+			'Convert analog value to motor command
+			brake = ( (SLOPE_R[0]*(curValRevAnalog) - OFFSET_R[0])) /SCALE
+			preValRevAnalog = curValRevAnalog
+		end if
+		'print("\nR: ",brake)
+		
+		direction = getvalue(_DIN,5)
+		
+		'print("\nD :",direction,"\n")
+		
+		'Read motor rpm
+		rpm1 = getvalue(_BS, 1) 
+		rpm2 = getvalue(_BS, 2)
+		
+		'Forward Direction
+		if(direction = 1) then
+			
+			if (brake >= BRAKE_THRESHOLD) then
+				'print("Brake\n")
+			
+				if (rpm1 >= BRAKE_ACTIVATE_THRESHOLD) then
+					setcommand(_G,1,((brake*-1)*3)/2)
+				'elseif (rpm1 <= BRAKE_RELEASE_THRESHOLD) then
+				'	setcommand(_G,1,0)
+				else
+			    	setcommand(_G,1,0)
+				end if
+			
+				if (rpm2 >= BRAKE_ACTIVATE_THRESHOLD) then
+					setcommand(_G,2,((brake*-1)*3)/2)
+				elseif (rpm1 <= BRAKE_RELEASE_THRESHOLD) then
+					setcommand(_G,2,0)
+				else
+			    	setcommand(_G,2,0)
+				end if
+			
+			elseif (throttle >= 10) then
+				'print("Go Fwd\n")
+				setcommand(_G,1,throttle)
+				setcommand(_G,2,throttle)
+				
+				
+			end if
+		
+		'Reverse Direction		
+		elseif (direction = 0) then
+		
+			if (brake > BRAKE_THRESHOLD	) then
+				print("Brake\n")
+				if (rpm1 < -BRAKE_ACTIVATE_THRESHOLD) then
+					setcommand(_G,1,(brake)*2)
+				elseif (rpm1 < -BRAKE_RELEASE_THRESHOLD) then
+					setcommand(_G,1,0)
+				else
+					setcommand(_G,1,0)
+				end if
+			
+				if (rpm2 < -BRAKE_ACTIVATE_THRESHOLD) then
+					setcommand(_G,2,(brake)*2)
+				elseif (rpm1 < -BRAKE_RELEASE_THRESHOLD) then
+					setcommand(_G,2,0)
+				else
+			   		setcommand(_G,2,0)
+				end if
+			
+			elseif (throttle > 0) then
+				'print("Go Rws\n")
+				setcommand(_G,1,throttle*-1)
+				setcommand(_G,2,throttle*-1)
+			end if
+		end if		
+	Return
+		
+		
+	
+	
+
